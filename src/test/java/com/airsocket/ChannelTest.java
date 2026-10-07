@@ -23,7 +23,6 @@ public class ChannelTest
         int testPort = 19090;
         BlockingQueue<String> receivedMessages = new LinkedBlockingQueue<>();
 
-        // Start listening
         Channel.listen(testPort, (data) ->
         {
             try
@@ -36,7 +35,18 @@ public class ChannelTest
             }
         });
 
-        Thread.sleep(100);
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline)
+        {
+            try (java.net.Socket probe = new java.net.Socket(InetAddress.getByName("127.0.0.1"), testPort))
+            {
+                break;
+            }
+            catch (Exception ignored)
+            {
+                Thread.sleep(20);
+            }
+        }
 
         Peer peer = new Peer("localhost", InetAddress.getByName("127.0.0.1"), testPort, 0);
         try (Channel channel = Channel.open(peer))

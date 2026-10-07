@@ -110,7 +110,16 @@ public class Discoverer
 
                         Pattern portPat = Pattern.compile("\"port\":(\\d+)");
                         Matcher portMat = portPat.matcher(message);
-                        int peerPort = portMat.find() ? Integer.parseInt(portMat.group(1)) : 0;
+                        if (!portMat.find())
+                        {
+                            continue;
+                        }
+
+                        int peerPort = Integer.parseInt(portMat.group(1));
+                        if (peerPort <= 0 || peerPort > 65535)
+                        {
+                            continue;
+                        }
 
                         InetAddress addr = receivePacket.getAddress();
 

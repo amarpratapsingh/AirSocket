@@ -22,9 +22,7 @@ public class Responder implements AutoCloseable
         this.socket.setReuseAddress(true);
         this.socket.bind(new InetSocketAddress(DISCOVERY_PORT));
 
-        this.thread = new Thread(this::listenLoop);
-        this.thread.setDaemon(true);
-        this.thread.start();
+        this.thread = Thread.ofVirtual().name("airsocket-discovery-", 0).start(this::listenLoop);
     }
 
     private void listenLoop()

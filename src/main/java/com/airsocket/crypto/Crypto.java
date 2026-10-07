@@ -6,18 +6,76 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.ByteBuffer;
 import java.security.SecureRandom;
-import java.security.spec.KeySpec;
+import java.util.Arrays;
 
 public class Crypto
 {
-    private static final int SALT_LENGTH = 16;
-    private static final int IV_LENGTH = 12;
+    public static final int SALT_LENGTH = 16;
+    public static final int IV_LENGTH = 12;
     private static final int KEY_LENGTH = 256;
     private static final int ITERATION_COUNT = 65536;
     private static final int TAG_LENGTH_BITS = 128;
 
-    public static byte[] encrypt(byte[] plaintext, String passphrase) throws Exception
+    public static byte[] deriveChunkIv(byte[] baseIv, long chunkIndex)
+    {
+        if (baseIv == null || baseIv.length != IV_LENGTH)
+        {
+            throw new IllegalArgumentException("Base IV must be exactly " + IV_LENGTH + " bytes");
+        }
+        byte[] chunkIv = baseIv.clone();
+        ByteBuffer buffer = ByteBuffer.wrap(chunkIv);
+        long originalCounter = buffer.getLong(4);
+        buffer.putLong(4, originalCounter ^ chunkIndex);
+        return chunkIv;
+    }
+
+    public static void wipe(char[] array)
+    {
+        if (array != null)
+        {
+            Arrays.fill(array, '\0');
+        }
+    }
+
+    public static SecretKeySpec deriveKey(char[] passphrase, byte[] salt) throws Exception
+    {
+        PBEKeySpec spec = new PBEKeySpec(passphrase, salt, ITERATION_COUNT, KEY_LENGTH);
+        try
+        {
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            SecretKey tmp = factory.generateSecret(spec);
+            return new SecretKeySpec(tmp.getEncoded(), "AES");
+        }
+        finally
+        {
+            spec.clearPassword();
+        }
+    }
+
+    public static SecretKeySpec deriveKey(String passphrase, byte[] salt) throws Exception
+    {
+        char[] chars = passphrase != null ? passphrase.toCharArray() : new char[0];
+        try
+        {
+            return deriveKey(chars, salt);
+        }
+        finally
+        {
+            wipe(chars);
+        }
+    }
+
+    public static Cipher getCipher(SecretKeySpec secretKey, byte[] iv, int mode) throws Exception
+    {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BITS, iv);
+        cipher.init(mode, secretKey, gcmSpec);
+        return cipher;
+    }
+
+    public static byte[] encrypt(byte[] plaintext, char[] passphrase) throws Exception
     {
         SecureRandom random = new SecureRandom();
         byte[] salt = new byte[SALT_LENGTH];
@@ -37,20 +95,39 @@ public class Crypto
         return result;
     }
 
-    public static Cipher getEncryptCipher(String passphrase, byte[] salt, byte[] iv) throws Exception
+    public static byte[] encrypt(byte[] plaintext, String passphrase) throws Exception
     {
-        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        KeySpec spec = new PBEKeySpec(passphrase.toCharArray(), salt, ITERATION_COUNT, KEY_LENGTH);
-        SecretKey tmp = factory.generateSecret(spec);
-        SecretKeySpec secretKey = new SecretKeySpec(tmp.getEncoded(), "AES");
-
-        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BITS, iv);
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmSpec);
-        return cipher;
+        char[] chars = passphrase != null ? passphrase.toCharArray() : new char[0];
+        try
+        {
+            return encrypt(plaintext, chars);
+        }
+        finally
+        {
+            wipe(chars);
+        }
     }
 
-    public static byte[] decrypt(byte[] combined, String passphrase) throws Exception
+    public static Cipher getEncryptCipher(char[] passphrase, byte[] salt, byte[] iv) throws Exception
+    {
+        SecretKeySpec secretKey = deriveKey(passphrase, salt);
+        return getCipher(secretKey, iv, Cipher.ENCRYPT_MODE);
+    }
+
+    public static Cipher getEncryptCipher(String passphrase, byte[] salt, byte[] iv) throws Exception
+    {
+        char[] chars = passphrase != null ? passphrase.toCharArray() : new char[0];
+        try
+        {
+            return getEncryptCipher(chars, salt, iv);
+        }
+        finally
+        {
+            wipe(chars);
+        }
+    }
+
+    public static byte[] decrypt(byte[] combined, char[] passphrase) throws Exception
     {
         if (combined.length < SALT_LENGTH + IV_LENGTH)
         {
@@ -69,16 +146,35 @@ public class Crypto
         return cipher.doFinal(ciphertext);
     }
 
+    public static byte[] decrypt(byte[] combined, String passphrase) throws Exception
+    {
+        char[] chars = passphrase != null ? passphrase.toCharArray() : new char[0];
+        try
+        {
+            return decrypt(combined, chars);
+        }
+        finally
+        {
+            wipe(chars);
+        }
+    }
+
+    public static Cipher getDecryptCipher(char[] passphrase, byte[] salt, byte[] iv) throws Exception
+    {
+        SecretKeySpec secretKey = deriveKey(passphrase, salt);
+        return getCipher(secretKey, iv, Cipher.DECRYPT_MODE);
+    }
+
     public static Cipher getDecryptCipher(String passphrase, byte[] salt, byte[] iv) throws Exception
     {
-        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        KeySpec spec = new PBEKeySpec(passphrase.toCharArray(), salt, ITERATION_COUNT, KEY_LENGTH);
-        SecretKey tmp = factory.generateSecret(spec);
-        SecretKeySpec secretKey = new SecretKeySpec(tmp.getEncoded(), "AES");
-
-        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BITS, iv);
-        cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmSpec);
-        return cipher;
+        char[] chars = passphrase != null ? passphrase.toCharArray() : new char[0];
+        try
+        {
+            return getDecryptCipher(chars, salt, iv);
+        }
+        finally
+        {
+            wipe(chars);
+        }
     }
 }

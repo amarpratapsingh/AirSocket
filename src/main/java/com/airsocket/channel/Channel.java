@@ -21,6 +21,9 @@ public class Channel implements AutoCloseable
     private Channel(Socket socket) throws IOException
     {
         this.socket = socket;
+        this.socket.setTcpNoDelay(true);
+        this.socket.setReceiveBufferSize(256 * 1024);
+        this.socket.setSendBufferSize(256 * 1024);
         this.out = new DataOutputStream(socket.getOutputStream());
         this.in = new DataInputStream(socket.getInputStream());
     }
@@ -51,19 +54,24 @@ public class Channel implements AutoCloseable
     public static void listen(int port, Consumer<byte[]> handler) throws IOException
     {
         ServerSocket serverSocket = new ServerSocket(port);
+        serverSocket.setReuseAddress(true);
+        serverSocket.setReceiveBufferSize(256 * 1024);
         synchronized (activeServers)
         {
             activeServers.add(serverSocket);
         }
 
-        Thread listenerThread = new Thread(() ->
+        Thread.ofVirtual().name("airsocket-listener-", 0).start(() ->
         {
             try
             {
                 while (!serverSocket.isClosed())
                 {
                     Socket clientSocket = serverSocket.accept();
-                    Thread clientThread = new Thread(() ->
+                    clientSocket.setTcpNoDelay(true);
+                    clientSocket.setReceiveBufferSize(256 * 1024);
+                    clientSocket.setSendBufferSize(256 * 1024);
+                    Thread.ofVirtual().name("airsocket-client-", 0).start(() ->
                     {
                         try (DataInputStream inClient = new DataInputStream(clientSocket.getInputStream()))
                         {
@@ -95,8 +103,6 @@ public class Channel implements AutoCloseable
                             }
                         }
                     });
-                    clientThread.setDaemon(true);
-                    clientThread.start();
                 }
             }
             catch (SocketException e)
@@ -115,8 +121,6 @@ public class Channel implements AutoCloseable
                 }
             }
         });
-        listenerThread.setDaemon(true);
-        listenerThread.start();
     }
 
     public static void closeAllListeners()

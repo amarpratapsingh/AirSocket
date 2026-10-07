@@ -1,8 +1,35 @@
-# Maven
-target/
+# Compiled Class Files
+*.class
+
+# Package Files & Archives
 *.jar
 *.war
 *.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# Log Files & JVM Crash Logs
+*.log
+hs_err_pid*
+replay_pid*
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.flattened-pom.xml
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
 
 # Eclipse
 .classpath
@@ -14,16 +41,35 @@ bin/
 .idea/
 *.iml
 *.iws
+*.ipr
+out/
 
 # NetBeans
 nbproject/
 build/
+nbbuild/
+dist/
+nbproject/private/
 
-# Operating System
+# Operating System & Editors
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+*~
+*.swp
+*.swo
+*.bak
+*.tmp
+*.temp
 
-# AirSocket transfer artifacts
+# AirSocket Transfer Artifacts & Test Payloads
 *.part
 *.part.meta
 Details.md
+*.pdf
+!docs/**/*.pdf
